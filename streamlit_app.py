@@ -9,20 +9,20 @@ import re
 import tempfile
 # from md2pdf.core import md2pdf
 
-GROQ_API_KEY = 'gsk_k2liMgRtLTnaN6JD8YAsWGdyb3FYq415lfaYKxTyahbTdm5DaSExyz'
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", None)
+x-rapidapi-key = os.environ.get("x-rapidapi-key", None)
 
-# Initialize session state variables
 if 'api_key' not in st.session_state:
     st.session_state.api_key = GROQ_API_KEY
 
- 
-if GROQ_API_KEY:
-    st.session_state.groq = Groq(api_key=GROQ_API_KEY)
-    st.session_state.groq_initialized = True
-else:
-    st.session_state.groq = None
-    st.session_state.groq_initialized = False
+if 'groq' not in st.session_state:
+    if GROQ_API_KEY:
+        st.session_state.groq = Groq()
 
+
+if 'x-rapidapi-key' not in st.session_state:
+    st.session_state.api_key = x-rapidapi-key
+	
 if 'button_disabled' not in st.session_state:
     st.session_state.button_disabled = False
 
@@ -296,7 +296,7 @@ def get_audio_url_from_video(video_url):
     api_url = "https://auto-download-all-in-one.p.rapidapi.com/v1/social/autolink"
     payload = {"url": video_url}
     headers = {
-	"x-rapidapi-key": "80cc8737f5msh80bae2219fffff9p18080bjsnc134084e00352024",
+	"x-rapidapi-key": x-rapidapi-key,
 	"x-rapidapi-host": "auto-download-all-in-one.p.rapidapi.com",
 	"Content-Type": "application/json"
     }
