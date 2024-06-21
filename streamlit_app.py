@@ -325,15 +325,15 @@ def download_audio(audio_url):
     else:
         raise ValueError("Failed to download audio from URL")
 
-def convert_audio_format(audio_file, target_format='mp3'):
-    """
-    Convert audio file to a supported format using pydub.
-    """
-    audio = pydub.AudioSegment.from_file(audio_file)
-    output = BytesIO()
-    audio.export(output, format=target_format)
-    output.seek(0)
-    return output
+# def convert_audio_format(audio_file, target_format='mp3'):
+#     """
+#     Convert audio file to a supported format using pydub.
+#     """
+#     audio = pydub.AudioSegment.from_file(audio_file)
+#     output = BytesIO()
+#     audio.export(output, format=target_format)
+#     output.seek(0)
+#     return output
 
 
 def extract_first_url(text):
@@ -454,7 +454,7 @@ try:
             elif video_url:
                 audio_url = get_audio_url_from_video(video_url)
                 audio_file = download_audio(audio_url)
-                audio_file = convert_audio_format(audio_file)  # Convert to mp3 if necessary
+                # audio_file = convert_audio_format(audio_file)
                 audio_file_path = save_to_temp_file(audio_file, target_format='mp3')
                 transcription_text = transcribe_audio(audio_file_path)
 
