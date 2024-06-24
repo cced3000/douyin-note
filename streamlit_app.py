@@ -492,7 +492,7 @@ try:
 
             audio_url = get_audio_url_from_video(video_url)
             
-            st.session_state.statistics_text = "已获取音频地址 ...." 
+            st.session_state.statistics_text = "已获取音频地址，正在下载音频数据 ...." 
             display_statistics()
             
             audio_file = download_audio(audio_url)
