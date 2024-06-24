@@ -12,25 +12,30 @@ import tempfile
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", None)
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", None)
 
+# Initialize session state variables
 if 'api_key' not in st.session_state:
     st.session_state.api_key = GROQ_API_KEY
 
-if 'groq' not in st.session_state:
-    if GROQ_API_KEY:
-        st.session_state.groq = Groq()
+ 
+if GROQ_API_KEY:
+    st.session_state.groq = Groq(api_key=GROQ_API_KEY)
+    st.session_state.groq_initialized = True
+else:
+    st.session_state.groq = None
+    st.session_state.groq_initialized = False
 
-
-if 'RAPIDAPI_KEY' not in st.session_state:
-    st.session_state.api_key = RAPIDAPI_KEY
-	
 if 'button_disabled' not in st.session_state:
     st.session_state.button_disabled = False
 
 if 'button_text' not in st.session_state:
-    st.session_state.button_text = "Generate Notes"
+    st.session_state.button_text = "获取视频文案"
 
 if 'statistics_text' not in st.session_state:
     st.session_state.statistics_text = ""
+    
+
+if 'formatted_transcript' not in st.session_state:
+    st.session_state.formatted_transcript = ""
 
 st.set_page_config(
     page_title="Groqnotes",
@@ -89,6 +94,7 @@ class NoteSection:
         self.structure = structure
         self.contents = {title: "" for title in self.flatten_structure(structure)}
         self.placeholders = {title: st.empty() for title in self.flatten_structure(structure)}
+        # self.transcribe_content = 
 
         st.markdown("## Raw transcript:")
         st.markdown(transcript)
@@ -103,6 +109,13 @@ class NoteSection:
         return sections
 
     def update_content(self, title, new_content):
+        try:
+            self.contents[title] += new_content
+            self.display_content(title)
+        except TypeError as e:
+            pass
+        
+    def update_transcribe_content(self, title,new_content):
         try:
             self.contents[title] += new_content
             self.display_content(title)
@@ -266,6 +279,38 @@ def generate_section(transcript: str, existing_notes: str, section: str):
             statistics_to_return = GenerationStatistics(input_time=usage.prompt_time, output_time=usage.completion_time, input_tokens=usage.prompt_tokens, output_tokens=usage.completion_tokens, total_time=usage.total_time, model_name="llama3-8b-8192")
             yield statistics_to_return
 
+
+def generate_format_transcript(transcript: str):
+    stream = st.session_state.groq.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[
+            {
+                "role": "system",
+                "content": "你是一位专业中文编辑。基于提供的转录内容，修改成中文内容、修正转录内容的错别字或者表达，并正确添加标点符号、分段。"
+            },
+            {
+                "role": "user",
+                "content": f"### 转录内容：\n\n{transcript}"
+            }
+        ],
+        temperature=0.3,
+        max_tokens=8000,
+        top_p=1,
+        stream=True,
+        stop=None,
+    )
+
+    for chunk in stream:
+        tokens = chunk.choices[0].delta.content
+        if tokens:
+            yield tokens
+        if x_groq := chunk.x_groq:
+            if not x_groq.usage:
+                continue
+            usage = x_groq.usage
+            statistics_to_return = GenerationStatistics(input_time=usage.prompt_time, output_time=usage.completion_time, input_tokens=usage.prompt_tokens, output_tokens=usage.completion_tokens, total_time=usage.total_time, model_name="llama3-8b-8192")
+            yield statistics_to_return
+
 # Initialize
 if 'button_disabled' not in st.session_state:
     st.session_state.button_disabled = False
@@ -277,7 +322,7 @@ if 'statistics_text' not in st.session_state:
     st.session_state.statistics_text = ""
 
 st.write("""
-# Douyin Note：根据抖音视频创建结构化笔记 🗒️⚡
+# 🎵 抖音文案提取工具 🗒️⚡
 """)
 
 def disable():
@@ -325,15 +370,15 @@ def download_audio(audio_url):
     else:
         raise ValueError("Failed to download audio from URL")
 
-# def convert_audio_format(audio_file, target_format='mp3'):
-#     """
-#     Convert audio file to a supported format using pydub.
-#     """
-#     audio = pydub.AudioSegment.from_file(audio_file)
-#     output = BytesIO()
-#     audio.export(output, format=target_format)
-#     output.seek(0)
-#     return output
+def convert_audio_format(audio_file, target_format='mp3'):
+    """
+    Convert audio file to a supported format using pydub.
+    """
+    audio = pydub.AudioSegment.from_file(audio_file)
+    output = BytesIO()
+    audio.export(output, format=target_format)
+    output.seek(0)
+    return output
 
 
 def extract_first_url(text):
@@ -394,36 +439,32 @@ try:
         #     st.write(f"\n\n")
 
 
-    if st.button('End Generation and Download Notes'):
-        if "notes" in st.session_state:
+    # if st.button('End Generation and Download Notes'):
+    #     if "notes" in st.session_state:
 
-            # Create markdown file
-            markdown_file = create_markdown_file(st.session_state.notes.get_markdown_content())
-            st.download_button(
-                label='Download Text',
-                data=markdown_file,
-                file_name='generated_notes.txt',
-                mime='text/plain'
-            )
+    #         # Create markdown file
+    #         markdown_file = create_markdown_file(st.session_state.notes.get_markdown_content())
+    #         st.download_button(
+    #             label='Download Text',
+    #             data=markdown_file,
+    #             file_name='generated_notes.txt',
+    #             mime='text/plain'
+    #         )
 
-            # Create pdf file (styled)
-            # pdf_file = create_pdf_file(st.session_state.notes.get_markdown_content())
-            # st.download_button(
-            #     label='Download PDF',
-            #     data=pdf_file,
-            #     file_name='generated_notes.pdf',
-            #     mime='application/pdf'
-            # )
-        else:
-            raise ValueError("Please generate content first before downloading the notes.")
+    #         # Create pdf file (styled)
+    #         # pdf_file = create_pdf_file(st.session_state.notes.get_markdown_content())
+    #         # st.download_button(
+    #         #     label='Download PDF',
+    #         #     data=pdf_file,
+    #         #     file_name='generated_notes.pdf',
+    #         #     mime='application/pdf'
+    #         # )
+    #     else:
+    #         raise ValueError("Please generate content first before downloading the notes.")
 
     with st.form("groqform"):
-        # audio_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4a"]) # TODO: Add a max size
-        audio_file = ""
         video_url = st.text_input("输入视频地址")  # 新增视频地址输入框
-        
         video_url = extract_first_url(video_url)
-        
         st.session_state.statistics_text = video_url
 
         # Generate button
@@ -442,55 +483,49 @@ try:
                     placeholder.empty()
 
         if submitted:
-            if audio_file is None and not video_url:
-                raise ValueError("Please upload an audio file or input a video URL")
+            if not video_url:
+                raise ValueError("Please input a video URL")
 
             st.session_state.button_disabled = True
             st.session_state.statistics_text = "正在后台转录视频内容，请等待几秒钟 ...."  # Show temporary message before transcription is generated and statistics show
             display_statistics()
 
-            if audio_file:
-                transcription_text = transcribe_audio(audio_file)
-            elif video_url:
-                audio_url = get_audio_url_from_video(video_url)
-                audio_file = download_audio(audio_url)
-                # audio_file = convert_audio_format(audio_file)
-                audio_file_path = save_to_temp_file(audio_file, target_format='mp3')
-                transcription_text = transcribe_audio(audio_file_path)
-
-            large_model_generation_statistics, notes_structure = generate_notes_structure(transcription_text)
-            print("Structure: ", notes_structure)
+            audio_url = get_audio_url_from_video(video_url)
+            
+            st.session_state.statistics_text = "已获取音频地址 ...." 
+            display_statistics()
+            
+            audio_file = download_audio(audio_url)
+            
+            st.session_state.statistics_text = "成功下载音频地址，正在解析音频内容中 ...." 
+            display_statistics()
+            
+            audio_file_path = save_to_temp_file(audio_file, target_format='mp3')
+            transcription_text = transcribe_audio(audio_file_path)
 
             total_generation_statistics = GenerationStatistics(model_name="llama3-8b-8192")
-
-            try:
-                notes_structure_json = json.loads(notes_structure)
-                notes = NoteSection(structure=notes_structure_json, transcript=transcription_text)
-                
-                if 'notes' not in st.session_state:
-                    st.session_state.notes = notes
-
-                st.session_state.notes.display_structure()
-
-                def stream_section_content(sections):
-                    for title, content in sections.items():
-                        if isinstance(content, str):
-                            content_stream = generate_section(transcript=transcription_text, existing_notes=notes.return_existing_contents(), section=(title + ": " + content))
-                            for chunk in content_stream:
-                                # Check if GenerationStatistics data is returned instead of str tokens
-                                chunk_data = chunk
-                                if type(chunk_data) == GenerationStatistics:
-                                    total_generation_statistics.add(chunk_data)
-                                    
-                                    st.session_state.statistics_text = str(total_generation_statistics)
-                                    display_statistics()
-                                elif chunk is not None:
-                                    st.session_state.notes.update_content(title, chunk)
-                        elif isinstance(content, dict):
-                            stream_section_content(content)
-
-                stream_section_content(notes_structure_json)
             
+            st.session_state.statistics_text = "已经获取视频文案，正在优化文案内容和排版 ...." 
+            display_statistics()
+
+            formatted_transcript = ""
+            try:
+                def generate_transcript_content(transcription_text):
+                    content_stream = generate_format_transcript(transcript=transcription_text)
+                    
+                    for chunk in content_stream:
+                        if isinstance(chunk, GenerationStatistics):
+                            total_generation_statistics.add(chunk)
+                            st.session_state.statistics_text = str(total_generation_statistics)
+                            display_statistics()
+                        elif chunk:
+                            st.session_state.formatted_transcript += chunk
+
+                generate_transcript_content(transcription_text)
+
+                st.markdown("## AI 优化后的视频文案：")
+                st.markdown(st.session_state.formatted_transcript.replace("Here is the rewritten text in Chinese:", "").replace('修改后的中文内容：', ""))
+                            
             except json.JSONDecodeError:
                 st.error("Failed to decode the notes structure. Please try again.")
 
